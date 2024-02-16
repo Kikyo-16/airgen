@@ -1,4 +1,7 @@
 # Byte-compiled / optimized / DLL files
+model_weights/
+demo/
+sf/
 __pycache__/
 *.py[cod]
 *$py.class
