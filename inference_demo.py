@@ -31,21 +31,23 @@ def load_data(audio_path: str, midi_path: str = None,
 
     if mode == "piano":
         assert midi_path is not None and os.path.exists(midi_path)
-
         from airgen.utilities.symbolic_utils import reduce_piano
-        reduce_piano(midi_path, midi_path + ".tmp.piano.mid")
         cond_path = midi_path + ".tmp.piano.mid.wav"
-        midi2wav(midi_path + ".tmp.piano.mid", cond_path, sf_path=SOUNDFONT_PATH, sample_rate=SAMPLE_RATE)
+        if not os.path.exists(cond_path):
+            reduce_piano(midi_path, midi_path + ".tmp.piano.mid")
+            midi2wav(midi_path + ".tmp.piano.mid", cond_path, sf_path=SOUNDFONT_PATH, sample_rate=SAMPLE_RATE)
 
     elif mode == "chord":
         assert chord_path is not None and os.path.exists(chord_path)
         assert beat_path is not None and os.path.exists(beat_path)
         from airgen.utilities.symbolic_utils import chord_with_beat
-        chord_with_beat(chord_path=chord_path,
-                        beat_path=beat_path,
-                        midi_path=chord_path + ".tmp.mid")
         cond_path = chord_path + ".mid.piano.tmp.wav"
-        midi2wav(chord_path + ".tmp.mid", cond_path, sf_path=SOUNDFONT_PATH, sample_rate=SAMPLE_RATE)
+        if not os.path.exists(cond_path):
+            chord_with_beat(chord_path=chord_path,
+                            beat_path=beat_path,
+                            midi_path=chord_path + ".tmp.mid")
+
+            midi2wav(chord_path + ".tmp.mid", cond_path, sf_path=SOUNDFONT_PATH, sample_rate=SAMPLE_RATE)
 
     elif mode == "fix_drums":
         cond_audio = wavs["drums"]
@@ -70,7 +72,7 @@ def load_data(audio_path: str, midi_path: str = None,
     return mix_rvq, cond_rvq
 
 
-def get_mask_2(x):
+def get_mask_1(x):
     xlen = x.shape[-1] // 2
     mask = torch.ones_like(x)
     qlen = xlen // 2
@@ -78,9 +80,33 @@ def get_mask_2(x):
     return mask
 
 
-def wrap_batch(mix_rvq, cond_rvq, n_samples):
-    mask = get_mask_2(mix_rvq[0])
+def get_mask_2(x):
+    xlen = x.shape[-1] // 2
+    qlen = xlen // 2
+    hqlen = qlen // 2
+    mask = torch.ones_like(x)
+    mask[hqlen:hqlen + qlen] = 0
+    mask[hqlen + qlen * 2:hqlen + qlen * 3] = 0
+    return mask
+
+
+def get_mask_3(x):
+    xlen = x.shape[-1] // 2
+    qlen = xlen // 2
+    hqlen = qlen // 2
+    hhlen = hqlen // 2
+    mask = torch.ones_like(x)
+    mask[hhlen:hqlen + hhlen] = 0
+    mask[hqlen * 2 + hhlen:hqlen * 3 + hhlen] = 0
+    mask[hqlen * 4 + hhlen: hqlen * 5 + hhlen] = 0
+    mask[hqlen * 6 + hhlen: hqlen * 7 + hhlen] = 0
+    return mask
+
+
+def wrap_batch(mix_rvq, cond_rvq, mask, n_samples):
     idx = mask == 1
+    mix_rvq = mix_rvq + 0.
+    cond_rvq = cond_rvq + 0.
     cond_rvq[:, idx] = mix_rvq[:, idx]
     trk_id = torch.cat([mask, mask + 2, mask[-1:] + 2], -1)
     seq = cond_rvq[None, ...].repeat(n_samples, 1, 1).long()
@@ -103,7 +129,6 @@ def save_preds(output_folder, batch, gen_tokens, n_samples, tag, with_prefix=Fal
     save_rvq(output_list=output_path, tokens=pred)
 
 
-
 def inference(args):
     output_folder = args.output_folder
     n_samples = args.num_samples
@@ -120,24 +145,37 @@ def inference(args):
     model = AIRGen(sec=30,
                    num_layers=48,
                    n_tasks=4,
-                   k=50).to(device)
+                   k=10).to(device)
     model.load_weights(args.model_path)
     model.eval()
     print("Wrap batch...")
-    batch = wrap_batch(mix_rvq, cond_rvq, n_samples=n_samples)
-    print("Predicting...")
-    with torch.no_grad():
-        gen_tokens = model.generate(**batch)
+    masks = [get_mask_1(mix_rvq[0]), get_mask_2(mix_rvq[0]), get_mask_3(mix_rvq[0])]
     save_preds(output_folder,
-               batch=batch,
-               gen_tokens=gen_tokens,
-               tag=args.mode,
-               n_samples=n_samples)
-    save_preds(output_folder,
-               batch=batch,
-               gen_tokens=batch["prompt"][:1],
-               tag=args.mode + "_cond",
+               batch={},
+               gen_tokens=mix_rvq[None, ...],
+               tag="ori",
                n_samples=1)
+    for i in range(3):
+        batch = wrap_batch(mix_rvq, cond_rvq, mask=masks[i], n_samples=n_samples)
+        print("Predicting...")
+        with torch.no_grad():
+            gen_tokens = model.generate(**batch)
+        save_preds(output_folder,
+                   batch=batch,
+                   gen_tokens=gen_tokens,
+                   tag=args.mode + f"_mask_{i}",
+                   n_samples=n_samples)
+        save_preds(output_folder,
+                   batch=batch,
+                   gen_tokens=gen_tokens,
+                   tag=args.mode + f"_mask_{i}_full",
+                   n_samples=n_samples,
+                   with_prefix=True)
+        save_preds(output_folder,
+                   batch=batch,
+                   gen_tokens=batch["prompt"][:1],
+                   tag=args.mode + f"_mask_{i}_cond",
+                   n_samples=1)
     print("All done.")
 
 
@@ -152,7 +190,7 @@ if __name__ == "__main__":
     parser.add_argument('-b', '--beat_path', type=str, default='')
     parser.add_argument('-f', '--drums_path', type=str, default='')
     parser.add_argument('-s', '--onset', type=int, default=0)
-    parser.add_argument('-n', '--num_samples', type=int, default=2)
+    parser.add_argument('-n', '--num_samples', type=int, default=5)
 
     args = parser.parse_args()
     inference(args)
