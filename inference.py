@@ -120,7 +120,7 @@ def inference(args):
     model = AIRGen(sec=30,
                    num_layers=48,
                    n_tasks=4,
-                   k=50).to(device)
+                   k=10).to(device)
     model.load_weights(args.model_path)
     model.eval()
     print("Wrap batch...")
