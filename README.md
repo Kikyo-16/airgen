@@ -28,11 +28,13 @@ See `demo_fm` folder for the input data format. Regarding `mode`, you can choose
 We provide with model weights (3.75M) with `m=10`. Download them via [drums](https://drive.google.com/file/d/163XEruv0vO9Pz24zsXz5qQz8lrCUZASD/view?usp=sharing), [chord](https://drive.google.com/file/d/1P2lKlA8s9T7FKwvdR-6kZBQ5aAiuIMcg/view?usp=sharing), and [piano](https://drive.google.com/file/d/1f4rMeSceAOQ_GBncEOXfMYkbN61Rui1K/view?usp=sharing). 
 
 # How to cite
-    @misc{lin2024arrange,
-      title={Arrange, Inpaint, and Refine: Steerable Long-term Music Audio Generation and Editing via Content-based Controls}, 
-      author={Liwei Lin and Gus Xia and Yixiao Zhang and Junyan Jiang},
-      year={2024},
-      eprint={2402.09508},
-      archivePrefix={arXiv},
-      primaryClass={cs.SD}
-    }
+````bibtex
+@misc{lin2024arrange,
+title={Arrange, Inpaint, and Refine: Steerable Long-term Music Audio Generation and Editing via Content-based Controls}, 
+author={Liwei Lin and Gus Xia and Yixiao Zhang and Junyan Jiang},
+year={2024},
+eprint={2402.09508},
+archivePrefix={arXiv},
+primaryClass={cs.SD}
+}
+````
