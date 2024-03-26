@@ -21,7 +21,7 @@ The project requires Python 3.11. See `requirements.txt`.
                         --beat_path=your_beat_path \
                         --drums_path=your_drums_path \
                         --onset=your_onset
-See `demo_fm` folder for the input data format. Regarding `mode`, you can choose one from `{fix_drums, edit_drums, piano, chord}`. `Onset` should be a number indicating the starting second of the input audio.
+See `demo_fm` folder for the input data format. Regarding `mode`, you can choose one from `{fix_drums, edit_drums, piano, chord}`. `Onset` should be a number indicating the starting second of the input audio. You can download soundfont [here](https://drive.google.com/drive/folders/1QyEgfsawUS2e_qUfGSZtXORMgAI9eypq?usp=sharing).
 
 
 ### Model Weights
